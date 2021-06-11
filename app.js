@@ -1,67 +1,140 @@
-var createError = require('http-errors');
-var express = require('express');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
+// ADR
+// - uuid used to have a unique file name to avoid possible concurrency issues
+//   - file with same name but different content processed concurrently
+// - set file size limits to avoid memory issues
+// - provide minimally useful and understandable error messages to the user
+//   - while logging detailed errors in the server for production developers
+// - we do not do much in terms of validating API responses and incoming requests
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
-var fileUpload = require('express-fileupload');
+const path = require('path');
+const createError = require('http-errors');
+const fse = require('fs-extra');
+const uuid = require('uuid');
+const logger = require('morgan');
+const zl = require("zip-lib");
+const express = require('express');
+const fileUpload = require('express-fileupload');
+const asyncHandler = require('express-async-handler')
 
-var app = express();
-
-var staticDir = path.join(__dirname, 'public');
-var viewDir = path.join(__dirname, 'views');
+const {staticDir, viewDir, uploadsDir, wipDir} = require("./constants");
+const {
+  retrieveSpellingErrors,
+  applyTextSuggestions,
+  extractZipFile,
+  readExtractedFile,
+  saveUploadedFile,
+  requestSpellChecks,
+} = require("./helpers");
+const uuidv4 = uuid.v4;
+const app = express();
 
 // view engine setup
 app.set('views', viewDir);
 app.set('view engine', 'pug');
 
-app.use(fileUpload());
+//Add the client URL to the CORS policy
+const cors = require("cors");
+const whitelist = ["http://localhost:3000"];
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || whitelist.indexOf(origin) !== -1) {
+      callback(null, true)
+    } else {
+      callback(new Error("Not allowed by CORS"))
+    }
+  },
+  credentials: true
+};
+app.use(cors(corsOptions));
+
+// Configure the file upload parameters
+app.use(fileUpload({
+  // avoids possible memory issues when uploading large files.
+  limits: {fileSize: 10 * 1024 * 1024},
+  preserveExtension: true,
+  abortOnLimit: true,
+  // That should be 1mn, do not to let the requesting browser (user) hanging forever!
+  uploadTimeout: 60000
+}));
+
 app.use(logger('dev'));
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
+app.use(express.urlencoded({extended: false}));
 app.use(express.static(staticDir));
 
+const indexRouter = require('./routes/index');
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
 
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  next(createError(404));
-});
-
-// error handler
-app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-  // render the error page
-  res.status(err.status || 500);
-  res.render('error');
-});
-
-app.post('/upload', function(req, res) {
-  let sampleFile;
-  let uploadPath;
-
+app.post('/upload', asyncHandler(async (req, res) => {
   if (!req.files || Object.keys(req.files).length === 0) {
     return res.status(400).send('No files were uploaded.');
   }
 
-  // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
-  sampleFile = req.files.sampleFile;
-  uploadPath = staticDir + `/${sampleFile.name}`;
+  const sampleFile = req.files.file;
+  if (!sampleFile || !sampleFile.name) {
+    return res.status(400).send('Could not get the name of the uploaded file.');
+  }
 
-  // Use the mv() method to place the file somewhere on your server
-  sampleFile.mv(uploadPath, function(err) {
-    if (err)
-      return res.status(500).send(err);
+  const uploadPath = path.join(uploadsDir, sampleFile.name);
+  const uid = uuidv4();
+  const extractDir = path.join(wipDir, uid);
+  let data;
 
-    res.send('File uploaded!');
-  });
+  try {
+    await saveUploadedFile(sampleFile, uploadPath);
+    await extractZipFile(uploadPath, extractDir);
+    data = await readExtractedFile(extractDir);
+  } catch (err) {
+    console.log(err);
+    await fse.remove(extractDir);
+    throw createError(500, `Failed to read docx file.`)
+  }
+
+  let xmlString;
+  try {
+    const {xmlObj, spellingErrors} = await retrieveSpellingErrors(data);
+    const responses = await requestSpellChecks(spellingErrors);
+    xmlString = await applyTextSuggestions(xmlObj)(responses);
+  } catch (err) {
+    console.log(err);
+    await fse.remove(extractDir);
+    throw createError(400, `Failed to retrieve or apply spelling suggestions.`)
+  }
+
+  // Update document and rezip it to docx format
+  // Leave that in the public directory so it is accessible
+  // with a standard GET query
+  const destFile = path.join(staticDir, [uid, sampleFile.name].join("."));
+
+  try {
+    await fse.outputFile(path.join(extractDir, "word", "document.xml"), xmlString)
+      .then(() => zl.archiveFolder(extractDir, destFile))
+      .then(() => fse.remove(extractDir))
+      .then(() => res.send({url: destFile}))
+  } catch (err) {
+    console.log(err);
+    throw createError(400, `Failed to update docx file with spelling suggestions.`)
+  }
+}));
+
+// catch 404 and forward to error handler
+app.use(function (req, res, next) {
+  next(createError(404));
+});
+
+// error handler
+app.use(function (err, req, res, next) {
+  // Check if the error is thrown from multer
+  if (err) {
+    // set locals, only providing error in development
+    res.locals.message = err.message;
+    res.locals.error = req.app.get('env') === 'development' ? err : {};
+
+    // render the error page
+    res.status(err.status || 500);
+    res.render('error');
+  }
 });
 
 module.exports = app;
+

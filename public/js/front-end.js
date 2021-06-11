@@ -1,59 +1,67 @@
-const submitHandler = (e) => {
-  e.preventDefault(); //prevent the form from submitting
+const axiosInstance = axios.create({
+  baseURL: "http://localhost:3000/",
+});
+
+const submitHandler = ({selectedFiles, setError, axiosInstance}) => (e) => {
+  e.preventDefault(); //prevents the form from submitting
   let formData = new FormData();
 
   formData.append("file", selectedFiles[0]);
-  //Clear the error message
-  setError("");
   axiosInstance
-    .post("/upload_file", formData, {
+    .post("/upload", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
       onUploadProgress: (data) => {
         //Set the progress value to show the progress bar
-        setProgress(Math.round((100 * data.loaded) / data.total));
+        console.log(`progress`, (Math.round((100 * data.loaded) / data.total)));
       },
     })
+    .then(res => {
+      console.log(`result`, res)
+    })
     .catch((error) => {
-      const { code } = error?.response?.data;
+      const {code} = error && error.response && error.response.data;
       switch (code) {
         case "FILE_MISSING":
-          setError("Please select a file before uploading!");
+          console.error("Please select a file before uploading!");
           break;
         case "LIMIT_FILE_SIZE":
-          setError("File size is too large. Please upload files below 1MB!");
+          console.error("File size is too large. Please upload files below 1MB!");
           break;
         case "INVALID_TYPE":
-          setError(
+          console.error(
             "This file type is not supported! Only .png, .jpg and .jpeg files are allowed"
           );
           break;
 
         default:
-          setError("Sorry! Something went wrong. Please try again later");
+          console.error("Sorry! Something went wrong. Please try again later");
           break;
       }
-    });
+    })
 };
 
-window.onload = function() {
+window.onload = function () {
   const dropzone = document.getElementById("dropzone");
-  dropzone.ondragover = dropzone.ondragenter = function(event) {
+  dropzone.ondragover = dropzone.ondragenter = function (event) {
     event.stopPropagation();
     event.preventDefault();
-  }
+  };
 
-  dropzone.ondrop = function(event) {
+  dropzone.ondrop = function (event) {
     event.stopPropagation();
     event.preventDefault();
 
-    const filesArray = event.dataTransfer.files;
-    for (let i=0; i<filesArray.length; i++) {
-      sendFile(filesArray[i]);
-    }
+    const selectedFiles = event.dataTransfer.files;
+    const setError = () => {
+    };
+    submitHandler({selectedFiles, setError, axiosInstance})({
+      preventDefault: () => {
+      }
+    })
   }
-}
+};
 
 const fileSelect = document.getElementById("fileSelect"),
   fileElem = document.getElementById("fileElem");
@@ -63,12 +71,17 @@ fileSelect.addEventListener("click", function (e) {
     fileElem.click();
   }
 
-fileElem.addEventListener("change", handleFiles, false);
-function handleFiles() {
-  const fileList = this.files; /* now you can work with the file list */
-  console.log(`filelist`, fileList)
-  // TODO: here have to submit
-}
+  fileElem.addEventListener("change", handleFiles, false);
+
+  function handleFiles() {
+    const selectedFiles = this.files;
+    const setError = () => {
+    };
+    submitHandler({selectedFiles, setError, axiosInstance})({
+      preventDefault: () => {
+      }
+    });
+  }
 
 }, false);
 
