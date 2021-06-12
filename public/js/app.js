@@ -3,6 +3,7 @@ const render = ReactDOM.render;
 const {useState, useRef} = React;
 
 // Hyperscript helpers
+// Cf. https://reactjs.org/docs/react-without-jsx.html
 const h = React.createElement;
 const div = (a, b) => h("div", a, b);
 const span = (a, b) => h("span", a, b);
@@ -18,12 +19,6 @@ const CHECKING_GRAMMAR = "cg";
 const REQUEST_FAILED = "rf";
 
 // Helpers
-function delay(n) {
-  return new Promise(function (resolve) {
-    setTimeout(resolve, n * 1000);
-  });
-}
-
 function requestUpload(axiosInstance, file) {
   let formData = new FormData();
 
@@ -39,7 +34,9 @@ function requestUpload(axiosInstance, file) {
 
 // App
 render(
-  h(App, {}, null),
+  h(StrictMode, {}, [
+    h(App, {}, null),
+  ]),
   rootElement
 );
 
@@ -55,10 +52,8 @@ function App() {
   const {
     controlState,
     isFileDraggedOver,
-    errorMessage,
     downloadURL
   } = state;
-  console.log(`state`, state);
 
   const uploadFile = (axiosInstance, file) => requestUpload(axiosInstance, file)
     .then(url => {
@@ -74,7 +69,7 @@ function App() {
       case INIT:
         return h(Init, {
           isFileDraggedOver,
-          onFileSelected: file => {
+          onFileSelected: (file) => {
             setState({...state, downloadURL: null, controlState: CHECKING_GRAMMAR});
             uploadFile(axiosInstance, file);
           },
@@ -96,17 +91,19 @@ function App() {
         return h(CheckingGrammar, {}, null);
 
       case DOWNLOADED_CORRECTED_FILE:
-        return h(Downloaded, {
-          url: downloadURL,
-          onRestart: (event) => setState(initState)
-        }, null)
+        return (
+          h(Downloaded, {
+            url: downloadURL,
+            onRestart: (event) => setState(initState)
+          }, null)
+        )
 
       case REQUEST_FAILED:
-        return h(RequestFailed, {
-          url: downloadURL,
-          message: errorMessage,
-          onRestart: (event) => setState(initState)
-        }, null)
+        return (
+          h(RequestFailed, {
+            onRestart: (event) => setState(initState)
+          }, null)
+        )
 
       default:
         return null
@@ -192,28 +189,34 @@ function Init({isFileDraggedOver, onFileSelected, onDrop, onDragEnter, onDragLea
 }
 
 function CheckingGrammar({}) {
-  return div({className: "checking-grammar primary"}, [
-    span( {className: "loading loading--full-height"}, "Checking grammar"),
-  ])
+  return (
+    div({className: "checking-grammar primary"}, [
+      span({className: "loading loading--full-height"}, "Checking grammar"),
+    ])
+  )
 }
 
 function Downloaded({url, onRestart}) {
-  return div({className: "downloaded primary" }, [
-    a( {href: url}, "Download corrected file"),
-    button({
-      className: "restart",
-      onClick: onRestart
-    }, "Restart")
-  ])
+  return (
+    div({className: "downloaded primary"}, [
+      a({href: url, "aria-label": "file download link"}, "Download corrected file"),
+      button({
+        className: "restart",
+        onClick: onRestart
+      }, "Restart")
+    ]))
 }
 
-function RequestFailed({url, message, onRestart}) {
-  console.error(message);
-
-  return div({className: ""}, [
-    div({className: "error"}, `Server failed!`),
-    button({onClick: onRestart}, "Restart")
-  ])
+function RequestFailed({onRestart}) {
+  // ADR:
+  // In the end, we don't show a more descriptive error message to the user.
+  // A more detailed error message is available in the network tab
+  // of the console.
+  return (
+    div({className: ""}, [
+      div({className: "error"}, `Server failed!`),
+      button({onClick: onRestart}, "Restart")
+    ]))
 }
 
 

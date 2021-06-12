@@ -199,9 +199,11 @@ In places, the requirements left options open, and we took some decisions:
 
 ## Possible improvements
 ### Backend
-- we do not check that the file that is being uploaded is indeed a docx file
+- remove download file after a while has passed or some other criteria to free server space
+- could do more to validate incoming data:
+  - post request (we do not check that the file that is being uploaded is indeed a docx file)
+  - spell checking response
 - could run some extra tests for files with unsafe characters
-- could check the validity of the docx document before processing it
 - tests with a larger variety of docx files
 - tests (unit, e2e)
 

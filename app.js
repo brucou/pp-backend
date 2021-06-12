@@ -2,8 +2,7 @@
 // - uuid used to have a unique file name to avoid possible concurrency issues
 //   - file with same name but different content processed concurrently
 // - set file size limits to avoid memory issues
-// - provide minimally useful and understandable error messages to the user
-//   - while logging detailed errors in the server for production developers
+// - provide minimally useful and understandable error messages back to client
 // - we do not do much in terms of validating API responses and incoming requests
 
 const path = require('path');
@@ -26,9 +25,11 @@ const {
   requestSpellChecks,
 } = require("./helpers");
 const uuidv4 = uuid.v4;
+
+// Express app
 const app = express();
 
-// view engine setup
+// View engine setup
 app.set('views', viewDir);
 app.set('view engine', 'pug');
 
@@ -80,30 +81,29 @@ app.post('/upload', asyncHandler(async (req, res) => {
   const extractDir = path.join(wipDir, uid);
   let data;
 
+  // Read the uploaded document
   try {
     await saveUploadedFile(sampleFile, uploadPath);
     await extractZipFile(uploadPath, extractDir);
     data = await readExtractedFile(extractDir);
   } catch (err) {
-    console.log(err);
     await fse.remove(extractDir);
     throw createError(500, `Failed to read docx file.`)
   }
 
+  // Fetch and apply spelling suggestions
   let xmlString;
   try {
     const {xmlObj, spellingErrors} = await retrieveSpellingErrors(data);
     const responses = await requestSpellChecks(spellingErrors);
     xmlString = await applyTextSuggestions(xmlObj)(responses);
   } catch (err) {
-    console.log(err);
     await fse.remove(extractDir);
     throw createError(400, `Failed to retrieve or apply spelling suggestions.`)
   }
 
-  // Update document and rezip it to docx format
-  // Leave that in the public directory so it is accessible
-  // with a standard GET query
+  // Save updated document in the public directory
+  // and return the link
   const filename = [uid, sampleFile.name].join(".");
   const destFile = path.join(staticDir, filename);
 
@@ -113,7 +113,6 @@ app.post('/upload', asyncHandler(async (req, res) => {
       .then(() => fse.remove(extractDir))
       .then(() => res.send({url: filename}))
   } catch (err) {
-    console.log(err);
     throw createError(400, `Failed to update docx file with spelling suggestions.`)
   }
 }));
@@ -125,7 +124,6 @@ app.use(function (req, res, next) {
 
 // error handler
 app.use(function (err, req, res, next) {
-  // Check if the error is thrown from multer
   if (err) {
     // set locals, only providing error in development
     res.locals.message = err.message;
