@@ -189,6 +189,10 @@ In places, the requirements left options open, and we took some decisions:
 ## Front-end
 We tried here to have a lean process without using `create-react-app` and a fully configured build environment. Instead, we use simple HTML, CSS, and JavaScript. For real production projects, naturally, a build configuration becomes valuable.
 
+We have two branches:
+- a simple implementation that leverages useState hook to handle the application state. That application works and is manually tested.
+- a second implementation that this time leverages a Redux-like pattern. A `controller` pure function controls the application and can be unit tested.
+
 ### Discrepancies vs. requirements
 In places, the requirements left options open, and we took some decisions:
 - we added an error screen that gives feedback to the user when a request to process the spelling mistakes in the document has failed.

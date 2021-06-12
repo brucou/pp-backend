@@ -1,6 +1,6 @@
 const StrictMode = React.StrictMode;
 const render = ReactDOM.render;
-const {useState, useRef} = React;
+const {useRef} = React;
 
 // Hyperscript helpers
 // Cf. https://reactjs.org/docs/react-without-jsx.html
