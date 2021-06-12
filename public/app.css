@@ -1,0 +1,120 @@
+body {
+    margin: 0;
+    padding: 0;
+}
+
+#root {
+    height:100%;
+    width:100%;
+    display: flex;
+    position: fixed;
+    align-items: center;
+    justify-content: center;
+}
+
+.app {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Arial", sans-serif;
+    font-weight: 400;
+    font-style: normal;
+    font-size: 14px;
+    line-height: 16.1px;
+    width: 360px;
+    height: 207px;
+    color: #7d7d7d;
+    background: #ffffff;
+    border: 1px solid #B8BCBE;
+    box-sizing: border-box;
+    border-radius: 4px;
+    position: fixed;
+}
+
+.init {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    width: 360px;
+    height: 207px;
+}
+
+.downloaded {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    width: 180px;
+    height: 80px;
+}
+
+a {
+    color: #007DC8;
+}
+
+button.restart {
+    background: #DEDEDE;
+    border-width: 0;
+    border-radius: 4px;
+    width: 88px;
+    height: 32px;
+    opacity: 0.7;
+}
+
+.invisible {
+    display: none;
+}
+.primary {
+    color: #7d7d7d;
+}
+
+.dragged-over {
+    border: 2px dotted;
+}
+
+.file-select {
+    background: #DEDEDE;
+    border-radius: 4px;
+    border-width: 0;
+    width: 162px;
+    height: 32px;
+    opacity: 0.7;
+}
+
+.file-select:hover {
+    background: #CBCBCB
+}
+
+.loading {
+    display: flex;
+    justify-content: center;
+}
+
+.loading--full-height {
+    align-items: center;
+    height: 100%;
+}
+
+.loading::before {
+    content: "";
+    margin-right: 8px;
+    width: 26px;
+    height: 26px;
+    border: 6px solid #ADCCEB;
+    border-top-color: #5998DA;
+    border-radius: 50%;
+    transform: rotate(1turn);
+    animation: loading 1s linear infinite;
+}
+
+@keyframes loading {
+    /* Safari support */
+    from {
+        transform: rotate(0turn);
+    }
+
+    to {
+        transform: rotate(1turn);
+    }
+}

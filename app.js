@@ -104,13 +104,14 @@ app.post('/upload', asyncHandler(async (req, res) => {
   // Update document and rezip it to docx format
   // Leave that in the public directory so it is accessible
   // with a standard GET query
-  const destFile = path.join(staticDir, [uid, sampleFile.name].join("."));
+  const filename = [uid, sampleFile.name].join(".");
+  const destFile = path.join(staticDir, filename);
 
   try {
     await fse.outputFile(path.join(extractDir, "word", "document.xml"), xmlString)
       .then(() => zl.archiveFolder(extractDir, destFile))
       .then(() => fse.remove(extractDir))
-      .then(() => res.send({url: destFile}))
+      .then(() => res.send({url: filename}))
   } catch (err) {
     console.log(err);
     throw createError(400, `Failed to update docx file with spelling suggestions.`)

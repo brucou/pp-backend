@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>Paperfile project</title>
+  <link rel="stylesheet" href="./app.css">
 </head>
 <body>
 
@@ -12,15 +14,11 @@
   <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
 
-    <div id="dropzone" style="margin:30px; width:500px; height:300px; border:1px dotted grey;">
-        <div  >Drop Word file here</div>
-    </div>
-<div>or</div>
-
-<input name="docx" type="file" id="fileElem" accept="application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword" style="display:none">
-<button id="fileSelect">Choose Word file</button>
+  <!-- App slot -->
+  <div id="root">
+  </div>
 
   <!-- Load our React component. -->
-  <script src="js/front-end.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

@@ -16,39 +16,8 @@ So:
 | Get  | returns a file previously generated or not found|
 | Post | gets the uploaded file and returns download link|
 
-## Functional breakdown
-- REST logic
-  - express stuff: parse the incoming requests
-  - Get -> standard stuff (cf. router)
-  - Post -> file processing function
-    - https://github.com/richardgirges/express-fileupload/tree/master/example
-- File processing function
-  - input: DOCX file, output: download link
-  - parse DOCX file
-  - for each mispelled word, look for corrections
-    - use a cache? or browser automatically does this?
-  - for every correction(s) found, pick the first one and replace wrong with good
-    - check DOMParser API for node
-    - XML parser playground: https://jsonformatter.org/xml-parser#Sample
-    - probably can use this to read the XML into an AST but not to replace text
-      - https://github.com/SAP/xml-tools/tree/master/packages/ast
-      - https://github.com/NaturalIntelligence/fast-xml-parser
-        - playground: https://naturalintelligence.github.io/fast-xml-parser/
-      - https://github.com/rgrove/parse-xml
-    - actually use docx4js to get the docx, check the shape of it and decide
-      - https://github.com/lalalic/docx4js
-  - convert back to DOCX
-  - generate link
-    - use unique link UUID?
-  - write DOCX to file
-    - in public directory? or in router directory? check express router docs
-
-## Scheduling
-- 
-
-## Issues
-### Front-end
-- accepts non-word files... `accept` property does not work??
+## Front-end
+cf. [Figma file](https://www.figma.com/file/qX18aK9vyAtMS28qKf8nrG/Fullstack-test-project?node-id=0%3A1).
 
 # Resources
 ## Spelling API
@@ -138,6 +107,8 @@ So:
 curl -X POST --header 'Content-Type: application/x-www-form-urlencoded' --header 'Accept: application/json' -d 'text=wrng&language=en-US&enabledOnly=false' 'https://api.languagetoolplus.com/v2/check'
 ```
 
+NOTE: **running the previous command failed on Windows!**
+
   - response schema:
 ```json
 {
@@ -193,3 +164,50 @@ curl -X POST --header 'Content-Type: application/x-www-form-urlencoded' --header
   ]
 }
 ```
+
+# Implementation
+## Interesting links
+- XML parser playground: https://jsonformatter.org/xml-parser#Sample
+- XML libraries
+  - https://github.com/SAP/xml-tools/tree/master/packages/ast
+  - https://github.com/NaturalIntelligence/fast-xml-parser
+  - playground: https://naturalintelligence.github.io/fast-xml-parser/
+  - https://github.com/rgrove/parse-xml
+- docx libraries   
+  - https://github.com/lalalic/docx4js
+  - mamooth
+  - open office convert
+  - some others, but we discarded all of them:
+    - unmaintained, no tests, scarce docs, and one did not work with the buffer provided in the request (maybe required an array buffer?)
+
+## Back-end
+### Discrepancies vs. requirements
+In places, the requirements left options open, and we took some decisions:
+- The requirement *Read and extract the text of the first paragraph of the first page.* may not be strictly implemented. The program will look for spelling mistakes everywhere in the document. That means the requirement is fulfilled only if it did not mean to read and extract **only** the text of the first paragraph of the first page.
+- we do not check that the file that is being uploaded is indeed a docx file.
+
+## Front-end
+We tried here to have a lean process without using `create-react-app` and a fully configured build environment. Instead, we use simple HTML, CSS, and JavaScript. For real production projects, naturally, a build configuration becomes valuable.
+
+### Discrepancies vs. requirements
+In places, the requirements left options open, and we took some decisions:
+- we added an error screen that gives feedback to the user when a request to process the spelling mistakes in the document has failed.
+- we also added limits to the documents that can be received to spare the backend (10 MB in the current implementation)
+
+### Known issues
+- accepts non-word files... `accept` property does not work?? We haven't found a way to intruct the browser file select input widget to only accept docx files. 
+
+## Possible improvements
+### Backend
+- we do not check that the file that is being uploaded is indeed a docx file
+- could run some extra tests for files with unsafe characters
+- could check the validity of the docx document before processing it
+- tests with a larger variety of docx files
+- tests (unit, e2e)
+
+### Front-end
+- we do not check that the file that is being uploaded is indeed a docx file
+- tests (unit, e2e)
+
+### Development process
+- Would be great if the Figma file would provide actual HTML/CSS that can be plugged in in the implementation. Currently only gives CSS, which generates some inefficiency in the handoff. 
