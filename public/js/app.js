@@ -10,15 +10,33 @@ const span = (a, b) => h("span", a, b);
 const button = (a, b) => h("button", a, b);
 const a = (a, b) => h("a", a, b);
 
-// Constants
+// Properties
 const baseURL = "http://localhost:3000/";
 const rootElement = document.getElementById("root");
+
+// Control states
 const INIT = "init";
-const DOWNLOADED_CORRECTED_FILE = "dcf";
+const FILE_AVAILABLE_FOR_DOWNLOAD = "fafd";
 const CHECKING_GRAMMAR = "cg";
 const REQUEST_FAILED = "rf";
 
+// Events
+const STARTED_APP = "sa";
+const SELECTED_FILE = "sf";
+const ENTERED_DROP_ZONE = "edz";
+const LEFT_DROP_ZONE = "ldz";
+const DROPPED_FILE_IN_DROP_ZONE = "dfidz";
+const CLICKED_RESTART = "cr";
+const REQUEST_SUCCEEDED = "rs";
+// Yeah that's just to avoid same moniker as REQUEST_FAILED control state
+const REQUEST_ERRORED = "re";
+
+// Commands
+const RENDER = "ctr";
+const UPLOAD_FILE = "ctuf";
+
 // Helpers
+
 function requestUpload(axiosInstance, file) {
   let formData = new FormData();
 
@@ -32,36 +50,157 @@ function requestUpload(axiosInstance, file) {
     .then(res => res.data && res.data.url)
 }
 
-// App
-render(
-  h(StrictMode, {}, [
-    h(App, {}, null),
-  ]),
-  rootElement
-);
+/**
+ * Takes an event and computes actions to perform. Actions are of two kinds:
+ * - updates the application state
+ * - execute effects
+ * Elm/Redux/Kingly(state machine) inspired.
+ * @param {{type: String, data: *}} event
+ * @param {*} state Application state
+ * @returns {{updates: {downloadURL: null, controlState: string}, commands: [{type: string, params}]}|{updates, commands: [{type: string, params}]}}
+ */
+function controller(event, state) {
+  const {type, data} = event;
+  switch (type) {
+    case STARTED_APP: {
+      const initState = data;
+      return {
+        updates: initState,
+        commands: [{type: RENDER, params: initState}]
+      }
+    }
 
-function App() {
-  const initState = {
-    controlState: "init",
-    isFileDraggedOver: false,
-    errorMessage: "",
-    downloadURL: null
+    case ENTERED_DROP_ZONE: {
+      const updates = {isFileDraggedOver: true};
+      return {
+        updates,
+        commands: [
+          {type: RENDER, params: updates}
+        ]
+      }
+    }
+
+    case LEFT_DROP_ZONE: {
+      const updates = {isFileDraggedOver: false};
+      return {
+        updates,
+        commands: [
+          {type: RENDER, params: updates}
+        ]
+      }
+    }
+
+    case DROPPED_FILE_IN_DROP_ZONE: {
+      const file = data;
+      const updates = {isFileDraggedOver: false, controlState: CHECKING_GRAMMAR};
+      return {
+        updates,
+        commands: [
+          {type: UPLOAD_FILE, params: file},
+          {type: RENDER, params: updates},
+        ]
+      }
+    }
+
+    case SELECTED_FILE: {
+      const file = data;
+      const updates = {downloadURL: null, controlState: CHECKING_GRAMMAR};
+      return {
+        updates,
+        commands: [
+          {type: UPLOAD_FILE, params: file},
+          {type: RENDER, params: updates}
+        ]
+      }
+    }
+
+    case CLICKED_RESTART: {
+      const updates = initState;
+      return {
+        updates,
+        commands: [{type: RENDER, params: updates}]
+      }
+    }
+
+    case REQUEST_ERRORED: {
+      const err = data;
+      // In the end, we don't show that to the user
+      // const htmlMessage = err && err.response && err.response.data || "Error!";
+      const updates = {downloadURL: null, controlState: REQUEST_FAILED};
+      return {
+        updates,
+        commands: [{type: RENDER, params: updates}]
+      }
+    }
+
+    case REQUEST_SUCCEEDED: {
+      const url = data;
+      const updates = {downloadURL: url, controlState: FILE_AVAILABLE_FOR_DOWNLOAD};
+      return {
+        updates,
+        commands: [{type: RENDER, params: updates}]
+      }
+    }
+
+  }
+}
+
+const axiosInstance = axios.create({baseURL});
+const createEffectHandlers = (axiosInstance) => ({
+  [RENDER]: (_, updatedState, __) => {
+    render(
+      h(StrictMode, {}, [
+        h(App, {...updatedState}, null),
+      ]),
+      rootElement
+    );
+  },
+  [UPLOAD_FILE]: (file, _, dispatch) => requestUpload(axiosInstance, file)
+    .then(url => dispatch({type: REQUEST_SUCCEEDED, data: url}))
+    .catch(err => dispatch({type: REQUEST_ERRORED, data: err}))
+});
+const effectHandlers = createEffectHandlers(axiosInstance);
+
+const createCommandHandler = (effectHandlers) => (commands, updatedState, dispatch) => {
+  if (!commands) return;
+
+  commands.forEach(({type, params}) => effectHandlers[type](params, updatedState, dispatch));
+};
+
+/**
+ * Should be non-destructive, i.e. at the very least shallow-copy
+ * @param {*} state
+ * @param {*} stateUpdates
+ * @returns {*} updated state
+ */
+const updateState = (state, stateUpdates) => ({...state, ...stateUpdates});
+const commandHandler = createCommandHandler(effectHandlers);
+
+let appState = {};
+const createDispatcher = (commandHandler, controller, updateState) => {
+  const dispatch = (event) => {
+    const {updates, commands} = controller(event, appState);
+    appState = updateState(appState, updates);
+    commandHandler(commands, appState, dispatch);
+  }
+
+  return dispatch
+};
+
+const dispatch = createDispatcher(commandHandler, controller, updateState);
+
+// Kick-off the app with the initial rendering
+const initState = {
+  controlState: "init",
+  isFileDraggedOver: false,
+  downloadURL: null
+};
+dispatch({type: STARTED_APP, data: initState});
+
+function App({controlState, isFileDraggedOver, downloadURL}) {
+  // TODO: update
+  const setState = () => {
   };
-  const axiosInstance = axios.create({baseURL});
-  const [state, setState] = useState(initState);
-  const {
-    controlState,
-    isFileDraggedOver,
-    downloadURL
-  } = state;
-
-  const uploadFile = (axiosInstance, file) => requestUpload(axiosInstance, file)
-    .then(url => {
-      setState({...state, downloadURL: url, controlState: DOWNLOADED_CORRECTED_FILE})
-    })
-    .catch(e => {
-      setState({...state, controlState: REQUEST_FAILED, errorMessage: e.toString()})
-    });
 
   const componentToDisplay = (() => {
     switch (controlState) {
@@ -69,39 +208,27 @@ function App() {
       case INIT:
         return h(Init, {
           isFileDraggedOver,
-          onFileSelected: (file) => {
-            setState({...state, downloadURL: null, controlState: CHECKING_GRAMMAR});
-            uploadFile(axiosInstance, file);
-          },
-          onDragEnter: (event) => {
-            setState({...state, isFileDraggedOver: true})
-          },
-          onDragLeave: (event) => {
-            setState({...state, isFileDraggedOver: false})
-          },
-          onDragOver: (event) => {
-          },
-          onDrop: (file) => {
-            setState({...state, isFileDraggedOver: false, controlState: CHECKING_GRAMMAR});
-            uploadFile(axiosInstance, file);
-          },
+          onFileSelected: (file) => dispatch({type: SELECTED_FILE, data: file}),
+          onDragEnter: (event) => dispatch({type: ENTERED_DROP_ZONE, data: void 0}),
+          onDragLeave: (event) => dispatch({type: LEFT_DROP_ZONE, data: void 0}),
+          onDrop: (file) => dispatch({type: DROPPED_FILE_IN_DROP_ZONE, data: file}),
         }, null);
 
       case CHECKING_GRAMMAR:
         return h(CheckingGrammar, {}, null);
 
-      case DOWNLOADED_CORRECTED_FILE:
+      case FILE_AVAILABLE_FOR_DOWNLOAD:
         return (
-          h(Downloaded, {
+          h(DownloadPrompt, {
             url: downloadURL,
-            onRestart: (event) => setState(initState)
+            onRestart: (event) => dispatch({type: CLICKED_RESTART, data: void 0})
           }, null)
         )
 
       case REQUEST_FAILED:
         return (
           h(RequestFailed, {
-            onRestart: (event) => setState(initState)
+            onRestart: (event) => dispatch({type: CLICKED_RESTART, data: void 0})
           }, null)
         )
 
@@ -196,7 +323,7 @@ function CheckingGrammar({}) {
   )
 }
 
-function Downloaded({url, onRestart}) {
+function DownloadPrompt({url, onRestart}) {
   return (
     div({className: "downloaded primary"}, [
       a({href: url, "aria-label": "file download link"}, "Download corrected file"),
