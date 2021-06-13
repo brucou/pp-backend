@@ -191,7 +191,7 @@ We tried here to have a lean process without using `create-react-app` and a full
 
 We have two branches:
 - a simple implementation that leverages useState hook to handle the application state. That application works and is manually tested.
-- a second implementation that this time leverages a Redux-like pattern. A `controller` pure function controls the application and can be unit tested.
+- a second implementation that this time leverages a Redux-like pattern. A `controller` pure function controls the application and can be unit-tested.
 
 ### Discrepancies vs. requirements
 In places, the requirements left options open, and we took some decisions:
@@ -213,7 +213,7 @@ In places, the requirements left options open, and we took some decisions:
 
 ### Front-end
 - we do not check that the file that is being uploaded is indeed a docx file
-- tests (unit, e2e)
+- tests (e2e)
 
 ### Development process
 - Would be great if the Figma file would provide actual HTML/CSS that can be plugged in in the implementation. Currently only gives CSS, which generates some inefficiency in the handoff. 

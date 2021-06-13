@@ -18,6 +18,7 @@ const {
   controller,
   updateState,
 } = paperFile;
+
 const createFakeCommandHandler = mutArray => (commands, appState, dispatch) => {
   mutArray.push(commands.map(command => {
     if (command.type === RENDER) return {type: RENDER, params: appState}
